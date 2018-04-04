@@ -9,23 +9,24 @@ data = xlsread('Sarcoidosis.xlsx', 'Regression_alldata', 'D2:V73');
 Y = data(2, :); % look at SVT and NSVT first
 X = [data(3:19,:); data(52:71,:)]';
 
-for i = 1:3
-Xtest = [X(:, 1:i-1), X(:, i+1:19)]
-Xtrain = X(:, i)
-end
+for i = 1:19
+Xtrain = [X(1:i-1,:); X(i+1:19,:)];
+Xtest = X(i,:);
+Ytrain = [Y(1:i-1), Y(i+1:19)];
+Ytest = Y(i);
 
 % find optimal tree complexity level
 rng(1); % For reproducibility
-MdlDeep = fitctree(X,Y,'CrossVal','on','MergeLeaves','off',...
+MdlDeep = fitctree(Xtrain,Ytrain,'CrossVal','on','MergeLeaves','off',...
     'MinParentSize',1,'Surrogate','on');
-MdlStump = fitctree(X,Y,'MaxNumSplits',1,'CrossVal','on', 'Surrogate', 'on');
+MdlStump = fitctree(Xtrain,Ytrain,'MaxNumSplits',1,'CrossVal','on', 'Surrogate', 'on');
 
-n = size(X,1);
+n = size(Xtrain,1);
 m = floor(log(n - 1)/log(2));
 learnRate = [0.1 0.25 0.5 1];
 numLR = numel(learnRate);
-maxNumSplits = 2.^(0:m);
-%maxNumSplits = [1 2 3];
+%maxNumSplits = 2.^(0:m);
+maxNumSplits = [1 2 3 4];
 numMNS = numel(maxNumSplits);
 numTrees = 150;
 Mdl = cell(numMNS,numLR);
@@ -33,7 +34,7 @@ Mdl = cell(numMNS,numLR);
 for k = 1:numLR
     for j = 1:numMNS
         t = templateTree('MaxNumSplits',maxNumSplits(j));
-        Mdl{j,k} = fitcensemble(X,Y,'NumLearningCycles',numTrees,...
+        Mdl{j,k} = fitcensemble(Xtrain,Ytrain,'NumLearningCycles',numTrees,...
             'Learners',t,'kFold',3,'LearnRate',learnRate(k));
     end
 end
@@ -74,11 +75,13 @@ fprintf('\nMaxNumSplits = %d\nLearning Rate = %0.2f\n',...
     maxNumSplits(idxMNS),learnRate(idxLR))
 
 tFinal = templateTree('MaxNumSplits',maxNumSplits(idxMNS));
-MdlFinal = fitcensemble(X,Y,'NumLearningCycles',idxNumTrees,...
+MdlFinal = fitcensemble(Xtrain,Ytrain,'NumLearningCycles',idxNumTrees,...
     'Learners',tFinal,'LearnRate',learnRate(idxLR))
 
 imp = predictorImportance(MdlFinal);
-label = predict(MdlFinal,X);
+label(i) = predict(MdlFinal,Xtest)
+end
+
 
 tp = sum(label(1:11));
 fp = sum(label(12:19));
@@ -89,3 +92,4 @@ acc = (tp + tn)/(tp+fp+tn+fn)
 sens = tp/(tp+fn)
 spec = tn/(tn+fp)
 
+sum(abs(label-Y)) % number incorrect
