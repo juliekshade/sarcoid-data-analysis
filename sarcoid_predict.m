@@ -9,11 +9,6 @@ data = xlsread('Sarcoidosis.xlsx', 'Regression_alldata', 'D2:V73');
 Y = data(2, :); % look at SVT and NSVT first
 X = [data(3:19,:); data(52:71,:)]';
 
-for i = 1:3
-Xtest = [X(:, 1:i-1), X(:, i+1:19)]
-Xtrain = X(:, i)
-end
-
 % find optimal tree complexity level
 rng(1); % For reproducibility
 MdlDeep = fitctree(X,Y,'CrossVal','on','MergeLeaves','off',...
@@ -25,16 +20,15 @@ m = floor(log(n - 1)/log(2));
 learnRate = [0.1 0.25 0.5 1];
 numLR = numel(learnRate);
 maxNumSplits = 2.^(0:m);
-%maxNumSplits = [1 2 3];
 numMNS = numel(maxNumSplits);
-numTrees = 150;
+numTrees = 37;
 Mdl = cell(numMNS,numLR);
 
 for k = 1:numLR
     for j = 1:numMNS
         t = templateTree('MaxNumSplits',maxNumSplits(j));
         Mdl{j,k} = fitcensemble(X,Y,'NumLearningCycles',numTrees,...
-            'Learners',t,'kFold',3,'LearnRate',learnRate(k));
+            'Learners',t,'kFold',5,'LearnRate',learnRate(k));
     end
 end
 
@@ -66,6 +60,7 @@ hL = legend([cellstr(num2str(learnRate','Learning Rate = %0.2f'));...
 hL.Position(1) = 0.6;
 
 [minErr,minErrIdxLin] = min(error(:));
+find(error(:)==minErr)
 [idxNumTrees,idxMNS,idxLR] = ind2sub(size(error),minErrIdxLin);
 
 fprintf('\nMin. misclass. rate = %0.5f',minErr)
@@ -77,7 +72,7 @@ tFinal = templateTree('MaxNumSplits',maxNumSplits(idxMNS));
 MdlFinal = fitcensemble(X,Y,'NumLearningCycles',idxNumTrees,...
     'Learners',tFinal,'LearnRate',learnRate(idxLR))
 
-view(MdlFinal.Trained{1},'Mode','graph')
+view(MdlFinal.Trained{1,1}.CompactRegressionLearner,'Mode','graph')
 
 imp = predictorImportance(MdlFinal);
 label = predict(MdlFinal,X);
